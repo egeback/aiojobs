@@ -1,3 +1,9 @@
+import sys
+sys.path.insert(0,"../") # prefer local version
+sys.path.insert(0,"./") # prefer local version
+sys.path.append("../aiojobs")
+sys.path.append("./aiojobs")
+
 import asyncio
 from contextlib import suppress
 from unittest import mock
@@ -23,6 +29,19 @@ async def test_job_awaited(scheduler):
     async def coro():
         pass
     job = await scheduler.spawn(coro())
+    await job.wait()
+
+    assert not job.active
+    assert job.closed
+    assert not job.pending
+    assert 'closed' in repr(job)
+    assert 'pending' not in repr(job)
+
+
+async def test_sync_job_awaited(scheduler):
+    def coro():
+        pass
+    job = await scheduler.spawn(coro)
     await job.wait()
 
     assert not job.active

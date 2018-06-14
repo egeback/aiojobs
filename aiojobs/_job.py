@@ -11,13 +11,14 @@ class Job:
     _explicit = False
     _task = None
 
-    def __init__(self, coro, scheduler, loop):
-        self._loop = loop
+    def __init__(self, scheduler, coro, *args, loop=None):
+        self._loop = loop or asyncio.get_event_loop()
+        self._args = args
         self._coro = coro
         self._scheduler = scheduler
-        self._started = loop.create_future()
+        self._started = self._loop.create_future()
 
-        if loop.get_debug():
+        if self._loop.get_debug():
             self._source_traceback = traceback.extract_stack(sys._getframe(2))
 
     def __repr__(self):
@@ -103,7 +104,17 @@ class Job:
 
     def _start(self):
         assert self._task is None
-        self._task = self._loop.create_task(self._coro)
+        # self._task = self._loop.create_task(self._coro)
+
+        if asyncio.iscoroutine(self._coro):
+            self._task = self._loop.create_task(self._coro)
+        # elif is_callback(self._coro):
+        #    self._loop.call_soon(self._coro, self._args)
+        elif asyncio.iscoroutinefunction(self._coro):
+            self._task = self._loop.create_task(self._coro(*self._args))
+        else:
+            self._task = self._loop.run_in_executor(None, self._coro, *self._args)
+
         self._task.add_done_callback(self._done_callback)
         self._started.set_result(None)
 

@@ -1,3 +1,9 @@
+import sys
+sys.path.insert(0,"../") # prefer local version
+sys.path.insert(0,"./") # prefer local version
+sys.path.append("../aiojobs")
+sys.path.append("./aiojobs")
+
 import pytest
 
 from aiojobs import create_scheduler

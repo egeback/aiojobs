@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import async_timeout
 
 from ._job import Job
 
@@ -10,6 +12,8 @@ except ImportError:  # pragma: no cover
     bases = Sized, Iterable, Container
 else:  # pragma: no cover
     bases = (Collection,)
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class Scheduler(*bases):
@@ -67,10 +71,11 @@ class Scheduler(*bases):
     def closed(self):
         return self._closed
 
-    async def spawn(self, coro):
+    """Added possibility to supply args to handle non async calls that can be called later when job is scheduled"""
+    async def spawn(self, coro, *args):
         if self._closed:
             raise RuntimeError("Scheduling a new job after closing")
-        job = Job(coro, self, self._loop)
+        job = Job(self, coro, *args, loop=self._loop)
         should_start = (self._limit is None or
                         self.active_count < self._limit)
         self._jobs.add(job)
@@ -142,3 +147,55 @@ class Scheduler(*bases):
                 # by Job._add_done_callback
                 # Thus we caught an task exception and we are good citizens
                 pass
+
+    """Added sync version of spawn"""
+    def sync_spawn(self, coro, *args):
+        """Start job or place in queue based limit and active count"""
+        if self._closed:
+            raise RuntimeError("Scheduling a new job after closing")
+        job = Job(self, coro, *args, loop=self._loop)
+        should_start = (self._limit is None or
+                        self.active_count < self._limit)
+        self._jobs.add(job)
+        if should_start:
+            job._start()
+        else:
+            # wait for free slot in queue
+            try:
+                print("is full?", self._pending.full(), "jobs:", len(self._jobs))
+                self._pending.put_nowait(job)
+            except asyncio.QueueFull as ex:
+                _LOGGER.exception("Could not schedule work", exc_info=ex)
+                raise ex
+        return job
+
+    """Added by @Marky Egebäck"""
+    @property
+    def pending_and_active_jobs(self):
+        active = []
+        for job in self._jobs:
+            if job.active or job.pending:
+                active.append(job)
+
+        return active
+
+    """Added by @Marky Egebäck"""
+    async def wait(self, timeout=None):
+        jobs = self.pending_and_active_jobs
+        """Wait for pending """
+        if len(jobs) > 0:
+            # limit = self._limit
+            try:
+                # self._limit = 0
+                with async_timeout.timeout(timeout=timeout,
+                                           loop=self._loop):
+                    for job in jobs:
+                        await job.wait()
+            except asyncio.CancelledError: # pragma: no cover
+                pass
+            except asyncio.TimeoutError as ex: # pragma: no cover
+                _LOGGER.exception("Timeout waiting for job")
+                raise ex
+            finally:
+                pass
+                # self._limit = limit

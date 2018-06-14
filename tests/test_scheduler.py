@@ -1,3 +1,9 @@
+import sys
+sys.path.insert(0, "../") # prefer local version
+sys.path.insert(0, "./") # prefer local version
+sys.path.append("../aiojobs")
+sys.path.append("./aiojobs")
+
 import asyncio
 from unittest import mock
 
@@ -18,6 +24,28 @@ async def test_spawn(scheduler, loop):
     assert len(scheduler) == 1
     assert list(scheduler) == [job]
     assert job in scheduler
+
+
+async def test_sync_spawn(scheduler, loop):
+    async def coro():
+        await asyncio.sleep(1, loop=loop)
+    job = scheduler.sync_spawn(coro())
+    assert not job.closed
+
+    assert len(scheduler) == 1
+    assert list(scheduler) == [job]
+    assert job in scheduler
+
+
+async def test_sync_spawn_queue_full(make_scheduler):
+    async def coro(timeout):
+        await asyncio.sleep(10)
+
+    scheduler = await make_scheduler(pending_limit=1, limit=1)
+    with pytest.raises(asyncio.QueueFull):
+        for i in range(5):
+            # spawn jobs
+            scheduler.sync_spawn(coro(i / 10))
 
 
 async def test_run_retval(scheduler, loop):
@@ -381,3 +409,27 @@ async def test_run_after_close(scheduler, loop):
 
     with pytest.warns(RuntimeWarning):
         del coro
+
+
+async def test_wait(make_scheduler):
+    class Counter(object):
+        def __init__(self, value=0):
+            self.value = value
+
+        def add(self):
+            self.value = self.value + 1
+
+    counter = Counter(0)
+
+    async def async_func(timeout):
+        await asyncio.sleep(timeout)
+        counter.add()
+
+    scheduler = await make_scheduler(limit=10)
+
+    for i in range(100):
+        # spawn jobs
+        await scheduler.spawn(async_func(0.1))
+
+    await scheduler.wait()
+    assert counter.value == 100
