@@ -11,7 +11,7 @@ PROJECT_EMAIL = 'marky@egeback.se'
 PROJECT_DESCRIPTION = 'Async jobs'
 PACKAGES = find_packages(exclude=['tests', 'tests.*'])
 PROJECT_URL = 'https://github.com/egeback/aiojobs'
-DOWNLOAD_URL = 'https://github.com/egeback/aiojobs/archive/v1.0.3.zip'
+DOWNLOAD_URL = 'https://github.com/egeback/aiojobs/archive/v1.0.0.zip'
 
 MIN_PY_VERSION = '.'.join(map(str, REQUIRED_PYTHON_VER))
 
@@ -38,11 +38,7 @@ setup(
     install_requires=REQUIRES,
     python_requires='>={}'.format(MIN_PY_VERSION),
     test_suite='tests',
-    keywords=['home', 'automation'],
-    entry_points={
-        'console_scripts': [
-            'hproxy = homeproxy.__main__:main'
-        ]
-    },
+    keywords=['jobs', 'api'],
+    entry_points={},
     # classifiers=PROJECT_CLASSIFIERS,
 )
