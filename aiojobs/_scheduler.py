@@ -149,7 +149,7 @@ class Scheduler(*bases):
                 pass
 
     """Added sync version of spawn"""
-    def sync_spawn(self, coro, *args):
+    def spawn_sync(self, coro, *args):
         """Start job or place in queue based limit and active count"""
         if self._closed:
             raise RuntimeError("Scheduling a new job after closing")
@@ -162,7 +162,7 @@ class Scheduler(*bases):
         else:
             # wait for free slot in queue
             try:
-                print("is full?", self._pending.full(), "jobs:", len(self._jobs))
+                # print("is full?", self._pending.full(), "jobs:", len(self._jobs))
                 self._pending.put_nowait(job)
             except asyncio.QueueFull as ex:
                 _LOGGER.exception("Could not schedule work", exc_info=ex)
@@ -184,9 +184,7 @@ class Scheduler(*bases):
         jobs = self.pending_and_active_jobs
         """Wait for pending """
         if len(jobs) > 0:
-            # limit = self._limit
             try:
-                # self._limit = 0
                 with async_timeout.timeout(timeout=timeout,
                                            loop=self._loop):
                     for job in jobs:
@@ -195,7 +193,6 @@ class Scheduler(*bases):
                 pass
             except asyncio.TimeoutError as ex: # pragma: no cover
                 _LOGGER.exception("Timeout waiting for job")
-                raise ex
+                # raise ex
             finally:
                 pass
-                # self._limit = limit
